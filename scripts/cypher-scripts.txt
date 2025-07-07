@@ -1,0 +1,218 @@
+LOAD CSV WITH HEADERS FROM 'file:///crash.csv' AS row
+CREATE (d:Crash {
+    crashID: row.crash_id,
+    crash_type: row.crash_type,
+    number_fatalities: row.number_fatalities,
+    speed_limit: row.speed_limit
+})
+
+LOAD CSV WITH HEADERS FROM 'file:///datetime.csv' AS row
+CREATE (d:Datetime {
+    datetimeID: row.date_id,
+    day_of_week: row.day_of_week,
+    month: row.month,
+    year: row.year,
+    time: row.time,
+    weekday: row.weekday,
+    time_of_day: row.time_of_day,
+    christmas_period: row.christmas_period,
+    easter_period: row.easter_period
+})
+
+LOAD CSV WITH HEADERS FROM 'file:///location.csv' AS row
+CREATE (d:Location {
+    locationID: row.location_id,
+    state: row.state,
+    remoteness_area: row.remoteness_area,
+    sa4_name: row.sa4_name,
+    lga_name: row.lga_name,
+    road_type: row.road_type
+})
+
+LOAD CSV WITH HEADERS FROM 'file:///person.csv' AS row
+CREATE (d:Person {
+    personID: row.person_id,
+    road_user: row.road_user,
+    gender: row.gender,
+    age: row.age,
+    age_grp: row.age_grp
+})
+
+LOAD CSV WITH HEADERS FROM 'file:///vehicle_type.csv' AS row
+CREATE (d:Vehicle {
+    vehicleID: row.vehicle_id,
+    bus_involved: row.bus_involved,
+    heavy_rigid_truck_involved: row.heavy_rigid_truck_involved,
+    articulated_truck_involved: row.articulated_truck_involved
+})
+
+
+
+LOAD CSV WITH HEADERS FROM 'file:///rel_involved.csv' AS row
+MATCH (c:Crash {crashID: row.crash_id}),
+      (p:Person {personID : row.person_id})
+CREATE (c)-[:INVOLVED]->(p)
+
+
+LOAD CSV WITH HEADERS FROM 'file:///rel_involvedVehicle.csv' AS row
+MATCH (c:Crash {crashID: row.crash_id}),
+      (v:Vehicle {vehicleID: row.vehicle_id})
+CREATE (c)-[:INVOLVED_VEHICLE]->(v)
+
+
+LOAD CSV WITH HEADERS FROM 'file:///rel_occurredAt.csv' AS row
+MATCH (c:Crash {crashID: row.crash_id}),
+      (l:Location {locationID: row.location_id})
+CREATE (c)-[:OCCURRED_AT]->(l)
+
+
+LOAD CSV WITH HEADERS FROM 'file:///rel_occurredOn.csv' AS row
+MATCH (c:Crash {crashID: row.crash_id}),
+      (d:Datetime {datetimeID: row.date_id})
+CREATE (c)-[:OCCURRED_ON]->(d)
+
+
+// Query A: Find all crashes in WA from 2020-2024 where articulated trucks were involved and multiple fatalities (Number Fatalities>1) occurred. For each crash, provide the road user, age of each road user, gender of each road user, LGA Name, month and year of the crash, and the total number of fatalities.
+
+MATCH (c:Crash)-[:INVOLVED_VEHICLE]->(v:Vehicle),
+    (c)-[:OCCURRED_ON]->(d:Datetime),
+    (c)-[:OCCURRED_AT]->(l:Location),
+    (c)-[:INVOLVED]->(p:Person)
+
+WHERE (d.year) STARTS WITH '202'
+    AND toInteger(c.number_fatalities) > 1
+    AND (l.state) = "WA" 
+
+RETURN p.road_user, p.age, p.gender, l.lga_name, d.month, d.year, c.number_fatalities
+
+
+// Query B: Find the maximum and minimum age for female and male motorcycle riders who were involved in fatal crashes during the Christmas Period or Easter Period in inner regional Australia. Output the following information: gender, maximum age and minimum age. (Hint: Zero results is a meaningful result in itself.)
+
+MATCH (c:Crash)-[:INVOLVED_VEHICLE]->(v:Vehicle),
+    (c)-[:OCCURRED_ON]->(d:Datetime),
+    (c)-[:OCCURRED_AT]->(l:Location),
+    (c)-[:INVOLVED]->(p:Person)
+WHERE (d.christmas_period="True" OR d.easter_period="True")
+    AND (l.remoteness_area='Inner Regional Australia')
+    AND (p.road_user='Motorcycle rider')
+RETURN p.gender,max(toInteger(p.age)), min(toInteger(p.age))
+
+
+// Query C: How many young drivers (Age Group = '17_to_25') were involved in fatal crashes on weekends vs. weekdays in each state during 2024? Output 4 columns: State name, weekends, weekdays, and the average age for all young drivers (Age Group = '17_to_25') who were involved in fatal crashes in each State.
+
+MATCH (c:Crash)-[:INVOLVED_VEHICLE]->(v:Vehicle),
+    (c)-[:OCCURRED_ON]->(d:Datetime),
+    (c)-[:OCCURRED_AT]->(l:Location),
+    (c)-[:INVOLVED]->(p:Person)
+WHERE p.age_grp = '17_to_25'
+    AND d.year = '2024'
+    AND p.road_user = 'Driver'
+WITH l.state AS state,
+    d.weekday = 'Weekday' AS is_weekday,
+    d.weekday = 'Weekend' AS is_weekend,
+    toInteger(p.age) AS age
+WITH state,
+    SUM(CASE WHEN is_weekday THEN 1 ELSE 0 END) AS num_weekday,
+    SUM(CASE WHEN is_weekend THEN 1 ELSE 0 END) AS num_weekend,
+    ROUND(avg(age),2) AS avg_age
+RETURN state, num_weekday, num_weekend, avg_age;
+
+// Query D: Identify all crashes in WA that occurred Friday (but categorised as a weekend) and resulted in multiple deaths, with victims being both male and female. For each crash, output the SA4 name, national remoteness areas, and national road type.
+
+MATCH (c:Crash)-[:INVOLVED_VEHICLE]->(v:Vehicle),
+      (c)-[:OCCURRED_ON]->(d:Datetime),
+      (c)-[:OCCURRED_AT]->(l:Location),
+      (c)-[:INVOLVED]->(p:Person)
+WHERE l.State = 'WA'
+    AND d.`Day of Week` = 'Friday'
+    AND d.Weekday='Weekend'
+    AND toInteger(c.`Number of Fatalities`) > 1
+WITH c,d,l, COLLECT(DISTINCT p.Gender) AS genders
+WHERE 'Male' IN genders AND 'Female' IN genders
+RETURN l.State, d.`Day of Week`,d.Weekday, c.`Number of Fatalities`, genders
+
+// Query E: Find the top 5 SA4 regions where the highest number of fatal crashes occur during peak hours (Time between 07:00-09:00 and 16:00-18:00). For each SA4 region, output the name of the region and the separate number of crashes that occurred during morning peak hours and afternoon peak hours (Renamed Morning Peak and Afternoon Peak).
+
+MATCH (c:Crash)-[:INVOLVED_VEHICLE]->(v:Vehicle),
+      (c)-[:OCCURRED_ON]->(d:Datetime),
+      (c)-[:OCCURRED_AT]->(l:Location),
+      (c)-[:INVOLVED]->(p:Person)
+WITH l.sa4_name AS sa4, d.time AS time
+WITH sa4,
+     SUM(CASE WHEN time STARTS WITH "7"
+        OR time STARTS WITH "8"
+        OR time = "9:00"
+        THEN 1 ELSE 0 END) AS `Morning Peak`,
+     SUM(CASE WHEN time STARTS WITH "16"
+        OR time STARTS WITH "17"
+        OR time = "18:00"
+        THEN 1 ELSE 0 END) AS `Afternoon Peak`
+WITH sa4, `Morning Peak`, `Afternoon Peak`,
+     (`Morning Peak` + `Afternoon Peak`) AS total_crashes
+RETURN sa4, `Morning Peak`, `Afternoon Peak`
+ORDER BY total_crashes DESC
+LIMIT 5;
+
+// Query F: Find paths with a length of 3 between any two LGAs. Return the top 3 paths, including the starting LGA and ending LGA for each path. Order results alphabetically by starting LGA and then ending LGA.
+
+MATCH (c1:Crash)-[:INVOLVED_VEHICLE]->(v1:Vehicle),
+    (c1)-[:OCCURRED_ON]->(d1:Datetime),
+    (c1)-[:OCCURRED_AT]->(l1:Location),
+    (c2:Crash)-[:INVOLVED_VEHICLE]->(v2:Vehicle),
+    (c2)-[:OCCURRED_ON]->(d2:Datetime),
+    (c2)-[:OCCURRED_AT]->(l2:Location)
+WHERE c1.crash_type = c2.crash_type
+    AND c1.crashID <> c2.crashID
+    AND c1.speed_limit = c2.speed_limit
+    AND (
+      v1.bus_involved = 'True' OR
+      v1.articulated_truck_involved = 'True' OR
+      v1.heavy_rigid_truck_involved = 'True'
+    )
+    AND (
+      v2.bus_involved = 'True' OR
+      v2.articulated_truck_involved = 'True' OR
+      v2.heavy_rigid_truck_involved = 'True'
+    )
+    AND d1.year = '2024'
+    AND d2.year = '2024'
+    AND id(l1) < id(l2)
+WITH DISTINCT l1, l2
+MERGE (l1)-[:CONNECTED_TO]->(l2);
+
+
+MATCH path = (lga1:Location)-[:CONNECTED_TO*3]->(lga2:Location)
+WHERE lga1.lga_name < lga2.lga_name
+WITH DISTINCT path, lga1.lga_name AS startLGA, lga2.lga_name AS endLGA
+ORDER BY startLGA, endLGA
+LIMIT 3
+RETURN path, startLGA, endLGA;
+
+
+// Cypher Query #1: For each age group, how many crashes occurred in WA on roads with a speed limit of 100 or higher during weekdays? Sort the age groups based on the total crash count from highest to lowest.
+
+MATCH (c:Crash)-[:OCCURRED_AT]->(l:Location),
+    (c)-[:OCCURRED_ON]->(d:Datetime),
+    (c)-[:INVOLVED]->(p:Person)
+WHERE l.state = 'WA'
+    AND (toInteger(c.speed_limit)>=100)
+    AND (d.weekday='Weekday')
+RETURN p.age_grp, COUNT(DISTINCT c) AS crashCount
+ORDER BY crashCount DESC;
+
+
+// Cypher Query #2: For each road type in NSW, how many fatal crashes involving multiple fatalities occurred in the post-COVID period (2023-2024)? Additionally, among these crashes, output how many occurred during the day and how many during the night.
+
+MATCH (c:Crash)-[:OCCURRED_AT]->(l:Location),
+    (c)-[:OCCURRED_ON]->(d:Datetime),
+    (c)-[:INVOLVED]->(p:Person)
+WHERE (d.year IN ['2023','2024'])
+    AND (toInteger(c.number_fatalities)>1)
+    AND (l.state = 'NSW')
+WITH l.road_type AS roadType,
+    d.time_of_day AS timeOfDay
+WITH roadType,
+    SUM(CASE WHEN timeOfDay = 'Day' THEN 1 ELSE 0 END) AS daytimeCrashes,
+    SUM(CASE WHEN timeOfDay = 'Night' THEN 1 ELSE 0 END) AS nighttimeCrashes,
+    COUNT(*) AS totalCrashes
+RETURN roadType, totalCrashes, daytimeCrashes, nighttimeCrashes
