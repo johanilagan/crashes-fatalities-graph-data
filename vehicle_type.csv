@@ -1,0 +1,8 @@
+vehicle_id,bus_involved,heavy_rigid_truck_involved,articulated_truck_involved
+V1,False,False,False
+V2,False,False,True
+V3,True,False,True
+V4,False,True,False
+V5,False,True,True
+V6,True,False,False
+V7,True,True,False
