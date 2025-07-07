@@ -17,7 +17,7 @@ Two example queries:
 1. For each age group, how many crashes occurred in WA on roads with a speed limit of 100 or higher during weekdays?
 2. For each road type in NSW, how many fatal crashes involving multiple fatalities occurred in the post-COVID period (2023-2024)? Also, distinguish between day and night.
 
-### Strengths and Limitations
+### 💪 Strengths and Limitations
 
 **Strengths:**
 - Straightforward and interpretable
@@ -95,16 +95,16 @@ CREATE (a)-[:REL_TYPE]->(b)
 ## ❓ Answering Business Queries
 
 <details>
-<summary>1. <strong>Articulated trucks with multiple fatalities in WA (2020–2024)</strong></summary>  
+<summary>1. <strong>Articulated trucks with multiple fatalities in WA (2020–2024)</strong></summary>
 
 <br>
 
 ***Query***: *Find all crashes in WA from 2020-2024 where articulated trucks were involved and multiple fatalities (Number Fatalities>1) occurred. For each crash, provide the road user, age of each road user, gender of each road user, LGA Name, month and year of the crash, and the total number of fatalities.*
 
 ***Result***: 449 matching records returned.
-</details>  
+</details>
 
-The query identifies all crashes in WA from 2020 to 2024 that involved articulated trucks and resulted in multiple fatalities. The Cypher query applies these filters and retrieves the relevant information for each crash. The query successfully returns 449 records, each satisfying all specified conditions. While some rows may appear similar or identical even, this is expected. Multiple individuals may be involved in the same crash, resulting in duplicate information but different person-level attributes that are not returned.
+The query identifies all crashes in WA from 2020 to 2024 that involved articulated trucks and resulted in multiple fatalities. The Cypher query applies these filters and retrieves the relevant information for each crash. The query successfully returns 449 records, each satisfying all specified conditions. While some rows may appear similar or even identical, this is expected. Multiple individuals may be involved in the same crash, resulting in duplicate information but different person-level attributes th...
 
 <br>
 
@@ -125,68 +125,112 @@ The query returns results only for the male gender, indicating that there are no
 <br>
 
 <details>
-<summary>3. <strong>Young drivers (17–25) crash breakdown by weekday/weekend by state (2024)</strong></summary>  
+<summary>3. <strong>Young drivers (17–25) crash breakdown by weekday/weekend by state (2024)</strong></summary>
 
 <br>
 
 ***Query***: How many young drivers (Age Group = '17_to_25') were involved in fatal crashes on weekends vs. weekdays in each state during 2024? Output 4 columns: State name, weekends, weekdays, and the average age for all young drivers (Age Group = '17_to_25') who were involved in fatal crashes in each State.
-  
-***Outputs***: state, weekday/weekend counts, and average age.
+
+***Result***: State, weekday/weekend counts, and average age.
 </details>
-The query determines how many young drivers in age groups 17 to 25 were involved in fatal crashes during weekdays and weekends across each state in 2024. The query first applies filters based on the required conditions. The query then uses the WITH clause to prepare values as for aggregation. To get the number of the weekdays and weekends, a CASE WHEN clause is applied inside a SUM() function. The use of CASE WHEN was guided by generative AI explanations to ensure correct application [4]. The query calculates the average age of the young drivers using the avg() function. The final output includes four columns – state name, number of weekday crashes, number of weekend crashes, and the average age of the drivers.
+
+The query determines how many young drivers in age groups 17 to 25 were involved in fatal crashes during weekdays and weekends across each state in 2024. The query first applies filters based on the required conditions. It then uses the WITH clause to prepare values for aggregation. To get the number of weekday and weekend crashes, a CASE WHEN clause is applied inside a SUM() function. The query calculates the average age of the young drivers using the avg() function. The final output includes four column...
 
 <br>
 
 <details>
-<summary>4. <strong>Friday crashes in WA (categorized as weekend), multiple deaths, both genders</strong></summary>  
+<summary>4. <strong>Friday crashes in WA (categorized as weekend), multiple deaths, both genders</strong></summary>
 
 <br>
 
 ***Query***: Identify all crashes in WA that occurred Friday (but categorised as a weekend) and resulted in multiple deaths, with victims being both male and female. For each crash, output the SA4 name, national remoteness areas, and national road type.
 
-***Results***: 2 crashes found with expected criteria.
+***Result***: 2 crashes found with expected criteria.
 </details>
 
-This query identifies all crashes in WA that occurred on a Friday (but were classified as a weekend) and involved multiple fatalities, with victims of both male and female genders. The query first filters the data using the required conditions. Next, the WITH clause is used to carry forward the required nodes and properties – specifically Crash, Datetime, and Location nodes. A second WHERE clause is then applied to ensure that both ‘Male’ and ‘Female’ appear in the list of involved genders. This confirms that the crash had victims of both genders. The final output includes the SA4 name, national remoteness area, and national road type for each qualifying crash. The query successfully returns two records, each representing a crash in WA on a Friday, involving multiple fatalities and included both male and female victims.
+This query identifies all crashes in WA that occurred on a Friday (but were classified as a weekend) and involved multiple fatalities, with victims of both male and female genders. The query first filters the data using the required conditions. A second WHERE clause is then applied to ensure that both ‘Male’ and ‘Female’ appear in the list of involved genders. The final output includes the SA4 name, national remoteness area, and national road type for each qualifying crash.
 
-<br> 
+<br>
 
 <details>
-
-<summary>5. <strong>Top 5 SA4 regions with highest peak-hour fatalities</strong></summary> 
+<summary>5. <strong>Top 5 SA4 regions with highest peak-hour fatalities</strong></summary>
 
 <br>
 
 ***Query***: Find the top 5 SA4 regions where the highest number of fatal crashes occur during peak hours (Time between 07:00-09:00 and 16:00-18:00). For each SA4 region, output the name of the region and the separate number of crashes that occurred during morning peak hours and afternoon peak hours (Renamed Morning Peak and Afternoon Peak).
 </details>
 
+This query identifies the top five SA4 regions with the highest number of fatal crashes that occurred during peak hours. Crashes are conditionally counted as either ‘Morning Peak’ or ‘Afternoon Peak’, aggregated using SUM(), and sorted by total. The query returns SA4 names and crash counts for both time periods.
+
+<br>
 
 <details>
-
 <summary>6. <strong>Find paths of length 3 between LGAs</strong></summary>
 
 <br>
 
-   → Introduced `:CONNECTED_TO` relationships with filtered conditions:
+***Query***: Find paths with a length of 3 between any two LGAs. Return the top 3 paths, including the starting LGA and ending LGA for each path. Order results alphabetically by starting LGA and then ending LGA.
+</details>
+
+This query identifies paths of length 3 between any two LGAs. To enable such queries, a [:CONNECTED_TO] relationship was introduced using the following code:
+
 ```cypher
-MATCH (l1)-[:CONNECTED_TO*3]-(l2)
-RETURN ...
+MATCH (c1:Crash)-[:INVOLVED_VEHICLE]->(v1:Vehicle),
+    (c1)-[:OCCURRED_ON]->(d1:Datetime),
+    (c1)-[:OCCURRED_AT]->(l1:Location),
+    (c2:Crash)-[:INVOLVED_VEHICLE]->(v2:Vehicle),
+    (c2)-[:OCCURRED_ON]->(d2:Datetime),
+    (c2)-[:OCCURRED_AT]->(l2:Location)
+WHERE c1.crash_type = c2.crash_type
+    AND c1.crashID <> c2.crashID
+    AND c1.speed_limit = c2.speed_limit
+    AND (
+      v1.bus_involved = 'True' OR
+      v1.articulated_truck_involved = 'True' OR
+      v1.heavy_rigid_truck_involved = 'True'
+)
+AND (
+      v2.bus_involved = 'True' OR
+      v2.articulated_truck_involved = 'True' OR
+      v2.heavy_rigid_truck_involved = 'True'
+    )
+    AND d1.year = '2024'
+    AND d2.year = '2024'
+    AND id(l1) < id(l2)
+WITH DISTINCT l1, l2
+MERGE (l1)-[:CONNECTED_TO]->(l2);
 ```
-</details>
+Once the :CONNECTED_TO relationships were created, paths of length 3 between LGAs became traversable. The final query successfully returns the top three paths, including the starting LGA, ending LGA, and the complete path ordered alphabetically by LGAs.
 
 
-<details>
-
-7. **Custom Query 1**: Crashes in WA on roads ≥100 speed limit during weekdays by age group  
-   → Aggregates crash count by `age_grp`.
-</details>
-
+<br>
 
 <details>
+<summary>7. <strong>Custom Query 1: Crashes in WA on roads ≥100 speed limit during weekdays by age group</strong></summary>
 
-8. **Custom Query 2**: Post-COVID (2023–2024) fatal crashes in NSW by road type and time of day  
-   → Uses `CASE WHEN` to split into `daytimeCrashes` and `nighttimeCrashes`.
+<br>
+
+***Query***: For each age group, how many crashes occurred in WA on roads with a speed limit of 100 or higher during weekdays? Sort the age groups based on the total crash count from highest to lowest.
 </details>
+
+The query uses a combination of WHERE, COUNT(DISTINCT ...), and ORDER BY clauses to filter and aggregate the relevant data. The query is looking for crashes in WA that occurred on a weekday and at a road that has a speed limit of 100 or above. It then groups the data by age group and counts the number of distinct crashes that satisfy these conditions. The output successfully returns a ranked list of age groups, showing which was most frequently involved in high-speed weekday crashes in WA.
+
+<br>
+
+<details>
+<summary>8. <strong>Custom Query 2: Post-COVID (2023–2024) fatal crashes in NSW by road type and time of day</strong></summary>
+
+<br>
+
+***Query***: For each road type in NSW, how many fatal crashes involving multiple fatalities occurred in the post-COVID period (2023-2024)? Additionally, among these crashes, output how many occurred during the day and how many during the night.
+</details>
+
+The query aims to identify, for each road type in NSW, the number of fatal crashes involving multiple fatalities that occurred during the post-COVID period (2023-2024). Additionally, it distinguishes how many of these crashes occurred during the day, and how many during the night.
+
+The query uses CASE WHEN to classify crashes based on the time of day property, separating them into daytime and nighttime crashes. These are aggregated using SUM() to count the number of crashes in each category. The output returns for each road type, the total number of fatal crashes that involve multiple fatalities, the number of crashes that occurred during the day and the number of crashes that occurred during the night.
+
+
+
 
 ---
 
@@ -220,8 +264,14 @@ This method offers a deeper insight that may not be evident through standard ana
 
 ### References
 
-[1] Neo4j Documentation – Graph Data Modeling  
-[2] Robinson, I. et al. “Graph Databases” (O'Reilly)  
-[3] Project 2 Brief – Crash Dataset  
-[4] OpenAI Generative Assistance  
-[5] Neo4j GDS Manual – BFS Algorithm  
+[1] “What Are Graph Models?,” Hypermode, 2022. [Online]. Available:
+https://hypermode.com/blog/graph-models
+
+[2] J. Webber, “RDF vs. Property Graphs: Choosing the Right Approach for Implementing a Knowledge Graph,” Neo4j Blog, June 4, 2024. [Online]. Available: https://neo4j.com/blog/knowledge-graph/rdf-vs-property-graphs-knowledge-graphs/
+
+[3] “Neo4j Documentation – Data Modeling Tutorial”, Neo4j, 2024. [Online]. Available:
+https://neo4j.com/docs/getting-started/data-modeling/tutorial-data-modeling/ 
+
+[4] “ChatGPT,” OpenAI, 2025. [Online]. Available: https://chat.openai.com/
+
+[5] “Breadth-First Search or BFS for a Graph,” GeeksforGeeks, April 21, 2025. [Online]. Available: https://www.geeksforgeeks.org/breadth-first-search-or-bfs-for-a-graph/#what-is-breadth-first-sea rch
